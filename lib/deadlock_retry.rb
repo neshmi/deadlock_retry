@@ -53,8 +53,11 @@ module DeadlockRetry
         raise unless DEADLOCK_ERROR_MESSAGES.any? { |msg| error.message =~ /#{Regexp.escape(msg)}/i }
 
         DeadlockRetry.deadlock_logger.call("Deadlock detected on retry #{retry_count}, restarting transaction", self)
-        log_innodb_status
-        raise if retry_count >= DeadlockRetry.maximum_retries_on_deadlock
+
+        if retry_count >= DeadlockRetry.maximum_retries_on_deadlock
+          log_innodb_status
+          raise
+        end
 
         retry_count += 1
         retry
