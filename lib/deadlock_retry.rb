@@ -28,6 +28,13 @@ module DeadlockRetry
   mattr_accessor :deadlock_logger
   self.deadlock_logger = proc { |msg, klass| klass.logger.warn(msg) if klass.logger }
 
+  # Define how long to wait before retrying a transaction, in milliseconds.
+  mattr_accessor :minimum_wait_before_retry
+  mattr_accessor :maximum_wait_before_retry
+
+  self.minimum_wait_before_retry = 100
+  self.maximum_wait_before_retry = 500
+
   def self.included(base)
     base.extend(ClassMethods)
     base.class_eval do
@@ -52,14 +59,22 @@ module DeadlockRetry
         raise if in_nested_transaction?
         raise unless DEADLOCK_ERROR_MESSAGES.any? { |msg| error.message =~ /#{Regexp.escape(msg)}/i }
 
-        DeadlockRetry.deadlock_logger.call("Deadlock detected on retry #{retry_count}, restarting transaction", self)
-
         if retry_count >= DeadlockRetry.maximum_retries_on_deadlock
+          DeadlockRetry.deadlock_logger.call("Deadlock detected after #{retry_count+1} tries, giving up", self)
           log_innodb_status
           raise
         end
 
         retry_count += 1
+
+        pause = DeadlockRetry.minimum_wait_before_retry +
+          rand(DeadlockRetry.maximum_retries_on_deadlock -
+            DeadlockRetry.minimum_wait_before_retry)
+
+        DeadlockRetry.deadlock_logger.call("Deadlock detected on try ##{retry_count}, restarting transaction in #{pause}s", self)
+
+        sleep(pause / 1000.0)
+
         retry
       end
     end
