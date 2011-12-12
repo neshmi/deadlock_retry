@@ -71,7 +71,7 @@ module DeadlockRetry
           rand(DeadlockRetry.maximum_retries_on_deadlock -
             DeadlockRetry.minimum_wait_before_retry)
 
-        DeadlockRetry.deadlock_logger.call("Deadlock detected on try ##{retry_count}, restarting transaction in #{pause}s", self)
+        DeadlockRetry.deadlock_logger.call("Deadlock detected on try ##{retry_count}, restarting transaction in #{pause}ms", self)
 
         sleep(pause / 1000.0)
 
