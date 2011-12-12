@@ -37,20 +37,24 @@ module DeadlockRetry
     end
   end
 
-  module ClassMethods
-    DEADLOCK_ERROR_MESSAGES = [
-      "Deadlock found when trying to get lock",
-      "Lock wait timeout exceeded"
-    ]
+  DEADLOCK_ERROR_PATTERNS = [
+    "Deadlock found when trying to get lock",
+    "Lock wait timeout exceeded"
+  ].map { |msg| /#{Regexp.escape(msg)}/i }
 
+  def self.is_deadlock?(exception)
+    return unless exception.is_a?(ActiveRecord::StatementInvalid)
+    DEADLOCK_ERROR_PATTERNS.any? { |pattern| exception.message =~ pattern }
+  end
+
+  module ClassMethods
     def transaction_with_deadlock_handling(*objects, &block)
       retry_count = 0
 
       begin
         transaction_without_deadlock_handling(*objects, &block)
       rescue ActiveRecord::StatementInvalid => error
-        raise if in_nested_transaction?
-        raise unless DEADLOCK_ERROR_MESSAGES.any? { |msg| error.message =~ /#{Regexp.escape(msg)}/i }
+        raise if in_nested_transaction? || !DeadlockRetry.is_deadlock?(error)
 
         DeadlockRetry.deadlock_logger.call("Deadlock detected on retry #{retry_count}, restarting transaction", self)
 
