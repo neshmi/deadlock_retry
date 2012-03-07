@@ -74,7 +74,7 @@ module DeadlockRetry
   def log_innodb_status
     # `show innodb status` is the only way to get visiblity into why the transaction deadlocked
     deadlock_log "INNODB Status follows:"
-    self.select_values("show innodb status").each { |line|
+    self.select_values("show engine innodb status").each { |line|
       deadlock_log(line)
     }
   rescue Exception => e
