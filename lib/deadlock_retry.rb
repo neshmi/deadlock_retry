@@ -71,8 +71,14 @@ module DeadlockRetry
     private
 
     def in_nested_transaction?
-      # open_transactions was added in 2.2's connection pooling changes.
-      connection.respond_to?(:open_transactions) && connection.open_transactions > 0
+      handler = ActiveRecord::Base.connection_handler
+      pools   = handler.connection_pools.values
+
+      pools.any? do |pool|
+        pool.send(:active_connections).any? do |connection|
+          connection.open_transactions > 0
+        end
+      end
     end
 
     def log_innodb_status
