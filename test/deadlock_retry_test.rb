@@ -3,34 +3,14 @@ require 'rubygems'
 require 'active_record'
 require 'active_record/base'
 require 'active_record/version'
+require 'sqlite3'
 puts "Testing ActiveRecord #{ActiveRecord::VERSION::STRING}"
 
 require 'test/unit'
 require "#{File.dirname(__FILE__)}/../lib/deadlock_retry"
 
-class MockModel
-  @@open_transactions = 0
-
-  def self.transaction(*objects)
-    @@open_transactions += 1
-    yield
-  ensure
-    @@open_transactions -= 1
-  end
-
-  def self.open_transactions
-    @@open_transactions
-  end
-
-  def self.connection
-    self
-  end
-
-  def self.logger
-    # nothing to do here
-  end
-
-  include DeadlockRetry
+ActiveRecord::Base.establish_connection :adapter => "sqlite3", :database => ":memory:"
+class MockModel < ActiveRecord::Base
 end
 
 class DeadlockRetryTest < Test::Unit::TestCase

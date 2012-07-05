@@ -28,6 +28,11 @@ module DeadlockRetry
   mattr_accessor :deadlock_logger
   self.deadlock_logger = proc { |msg, klass| klass.logger.warn(msg) if klass.logger }
 
+  # A proc returning an array of connection_handlers that are active in the application,
+  # which will be checked for open transactions.
+  mattr_accessor :active_connection_handlers
+  self.active_connection_handlers = proc { [ ActiveRecord::Base.connection_handler ] }
+
   def self.included(base)
     base.extend(ClassMethods)
     base.class_eval do
@@ -71,12 +76,13 @@ module DeadlockRetry
     private
 
     def in_nested_transaction?
-      handler = ActiveRecord::Base.connection_handler
-      pools   = handler.connection_pools.values
+      handlers = DeadlockRetry.active_connection_handlers.call
 
-      pools.any? do |pool|
-        pool.send(:active_connections).any? do |connection|
-          connection.open_transactions > 0
+      handlers.any? do |handler|
+        handler.connection_pools.values.any? do |pool|
+          pool.send(:active_connections).any? do |connection|
+            connection.open_transactions > 0
+          end
         end
       end
     end
