@@ -80,7 +80,7 @@ module DeadlockRetry
 
       handlers.any? do |handler|
         handler.connection_pools.values.any? do |pool|
-          pool.send(:verify_active_connections?).any? do |connection|
+          pool.send(:verify_active_connections!).any? do |connection|
             connection.open_transactions > 0
           end
         end
